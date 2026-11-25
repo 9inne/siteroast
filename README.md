@@ -37,3 +37,4 @@ npm run dev
 ## Deploying on Netlify
 
 Connect the GitHub repo in Netlify; `netlify.toml` already has the build settings. Add every variable from `.env.example` under Site configuration → Environment variables, set `NEXT_PUBLIC_SITE_URL` to the live address, then deploy.
+
