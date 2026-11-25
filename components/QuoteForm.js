@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { BUDGETS } from '@/lib/constants';
-import { Check } from './Icons';
 
 const MESSAGES = {
   name: 'Please add your name.',
@@ -19,21 +18,20 @@ export default function QuoteForm({ roastId, host, fixes }) {
   async function submit(e) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    const body = {
-      roastId,
-      name: form.get('name'),
-      email: form.get('email'),
-      phone: form.get('phone'),
-      fixes: form.getAll('fixes'),
-      budget: form.get('budget'),
-    };
     setStatus('sending');
     setError('');
     try {
       const res = await fetch('/api/lead', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          roastId,
+          name: form.get('name'),
+          email: form.get('email'),
+          phone: form.get('phone'),
+          fixes: form.getAll('fixes'),
+          budget: form.get('budget'),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'default');
@@ -47,23 +45,21 @@ export default function QuoteForm({ roastId, host, fixes }) {
 
   if (status === 'sent') {
     return (
-      <div className="done" role="status">
-        <Check size={40} />
-        <h1 className="display" style={{ fontSize: 28, fontWeight: 700 }}>Request sent.</h1>
-        <p className="muted" style={{ margin: 0 }}>Thanks! You’ll get a quote by email within 24 hours.</p>
-        <Link href={`/r/${roastId}`} className="btn btn--ghost" style={{ marginTop: 8 }}>Back to my report</Link>
+      <div className="q-done" role="status">
+        <span className="kicker">Request received</span>
+        <h1 className="narrow-title" style={{ margin: 0 }}>Thank you. We’ll be <em>in touch</em>.</h1>
+        <p className="muted" style={{ margin: 0 }}>You’ll get a quote by email within 24 hours.</p>
+        <Link href={`/r/${roastId}`} className="btn btn-line" style={{ marginTop: 8 }}>Back to the review</Link>
       </div>
     );
   }
 
   return (
     <>
-      <h1 className="display" style={{ margin: '24px 0 8px', fontSize: 28, fontWeight: 700, lineHeight: 1.15 }}>Let’s fix {host}</h1>
-      <p className="muted" style={{ margin: 0, fontSize: 15 }}>
-        Your report is attached automatically. You’ll get a quote within 24 hours, with no obligation.
-      </p>
+      <h1 className="narrow-title">Let’s fix <em>{host}</em></h1>
+      <p className="muted" style={{ margin: 0 }}>Your review is attached automatically. You’ll get a quote within 24 hours, with no obligation.</p>
 
-      <form className="form" onSubmit={submit} noValidate>
+      <form className="qform" onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor="name" className="label">Your name</label>
           <input id="name" name="name" className="input" autoComplete="name" required />
@@ -73,7 +69,7 @@ export default function QuoteForm({ roastId, host, fixes }) {
           <input id="email" name="email" type="email" className="input" autoComplete="email" placeholder="you@business.com" required />
         </div>
         <div className="field">
-          <label htmlFor="phone" className="label">Phone or WhatsApp <span className="faint" style={{ fontWeight: 400 }}>(optional)</span></label>
+          <label htmlFor="phone" className="label">Phone or WhatsApp <span style={{ color: 'var(--mute)', fontWeight: 400 }}>(optional)</span></label>
           <input id="phone" name="phone" type="tel" className="input" autoComplete="tel" />
         </div>
 
@@ -101,7 +97,7 @@ export default function QuoteForm({ roastId, host, fixes }) {
 
         {error && <p className="error-text" role="alert">{error}</p>}
 
-        <button type="submit" className="btn btn--primary btn--block" disabled={status === 'sending'} style={{ marginTop: 6 }}>
+        <button type="submit" className="btn btn-ink btn-block" disabled={status === 'sending'}>
           {status === 'sending' ? 'Sending…' : 'Send my request'}
         </button>
       </form>

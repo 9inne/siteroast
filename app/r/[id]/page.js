@@ -1,36 +1,52 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import Logo from '@/components/Logo';
-import ScoreRing from '@/components/ScoreRing';
-import { Chevron, ShareIcon } from '@/components/Icons';
+import Masthead from '@/components/Logo';
+import Lines from '@/components/Lines';
+import Stamp from '@/components/Stamp';
+import ReviewBody from '@/components/ReviewBody';
 import { getRoast, percentileFor } from '@/lib/supabase';
-import { barColor, scoreLabel } from '@/lib/scoring';
+import { scoreLabel } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
+
+const plain = (s) => String(s || '').replace(/\*/g, '');
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const roast = await getRoast(id);
-  if (!roast) return { title: 'Report not found' };
+  if (!roast) return { title: 'Review not found' };
   const title = `${roast.host} scored ${roast.score}/100`;
+  const description = plain(roast.headline);
   return {
     title,
-    description: roast.headline,
-    openGraph: { title: `${title} on SiteRoast`, description: roast.headline, images: [{ url: `/r/${id}/card`, width: 1200, height: 630 }] },
-    twitter: { card: 'summary_large_image', title, description: roast.headline, images: [`/r/${id}/card`] },
+    description,
+    openGraph: { title: `${title} · SiteRoast review`, description, images: [{ url: `/r/${id}/card`, width: 1200, height: 630 }] },
+    twitter: { card: 'summary_large_image', title, description, images: [`/r/${id}/card`] },
   };
 }
 
-function timeAgo(iso) {
+function reviewedWhen(iso) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 2) return 'just now';
-  if (mins < 60) return `${mins} minutes ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (mins < 2) return 'Reviewed just now';
+  if (mins < 60) return `Reviewed ${mins} minutes ago`;
+  return `Reviewed ${new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
-export default async function Report({ params }) {
+const NOTE = {
+  bad: 'Good bones, but it’s losing people before they get to know you.',
+  mid: 'Getting there. A few focused fixes would make a real difference.',
+  good: 'A solid site. Polish the details below and it shines.',
+};
+
+function Chevron() {
+  return (
+    <svg className="sr-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+export default async function Review({ params }) {
   const { id } = await params;
   const roast = await getRoast(id);
   if (!roast) notFound();
@@ -39,110 +55,79 @@ export default async function Report({ params }) {
   const percentile = await percentileFor(roast.score).catch(() => null);
 
   return (
-    <div className="page">
-      <header className="topbar">
-        <Logo />
-        <Link className="topbar-link" href="/">New roast</Link>
-      </header>
+    <>
+      <Masthead right={<Link className="mast-link" href="/">Review another site</Link>} />
+      <main>
+        <article className="report">
+          <div className="page">
+            <header className="r-head">
+              <div>
+                <span className="kicker">Review · {roast.host}</span>
+                <Lines text={roast.headline} className={`r-title${plain(roast.headline).length > 80 ? ' long' : ''}`} />
+                <div className="byline kicker">
+                  <span>{reviewedWhen(roast.created_at)}</span>
+                  {percentile != null && <span>Better than {percentile}% of sites reviewed</span>}
+                </div>
+              </div>
+              <div className="stamp-wrap">
+                <Stamp score={roast.score} />
+                <div className="rating-note">
+                  <span className={`tag tag-${label.tone}`}>{label.text}</span>
+                  <p>{NOTE[label.tone]}</p>
+                </div>
+              </div>
+            </header>
 
-      <div className="report-meta">{roast.host} · roasted {timeAgo(roast.created_at)}</div>
+            <ReviewBody host={roast.host} shotSrc={roast.has_mobile_shot ? `/r/${id}/shot/mobile` : null} fixes={roast.fixes}>
+              <section>
+                <h2 className="sec-h">The <em>scorecard</em></h2>
+                <div className="score-rows">
+                  {roast.categories.map((c) => (
+                    <details key={c.key}>
+                      <summary>
+                        <span className="sr-name">{c.name}</span>
+                        <span className="sr-val">{c.score ?? '—'}<small>/100</small></span>
+                        <Chevron />
+                        <span className="sr-bar" aria-hidden="true">
+                          <i style={{ width: `${c.score ?? 0}%`, background: c.score != null && c.score < 50 ? 'var(--pen)' : 'var(--ink)' }} />
+                        </span>
+                      </summary>
+                      {c.score == null ? (
+                        <p className="sr-ok">We couldn’t check this one. The site may block automated visitors.</p>
+                      ) : c.issues.length ? (
+                        <ul className="sr-list">{c.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+                      ) : (
+                        <p className="sr-ok">Nothing major here. Nice work.</p>
+                      )}
+                    </details>
+                  ))}
+                </div>
+              </section>
 
-      <div className="report">
-        <section className="card verdict report-verdict" aria-label="Verdict">
-          <div className="verdict-top">
-            <ScoreRing score={roast.score} />
-            <div className="verdict-tags">
-              <span className={`badge badge--${label.tone}`}>{label.text}</span>
-              {percentile != null && (
-                <span className="muted" style={{ fontSize: 14, lineHeight: 1.4 }}>
-                  Better than {percentile}% of sites we’ve roasted
-                </span>
+              {roast.has_desktop_shot && (
+                <figure className="plate" style={{ margin: 0 }}>
+                  <div className="laptop-shot"><img src={`/r/${id}/shot/desktop`} alt={`${roast.host} on a laptop`} loading="lazy" /></div>
+                  <figcaption><em>Fig. 2</em> <span className="kicker">· On a laptop</span></figcaption>
+                </figure>
               )}
-            </div>
+
+              <div className="quick">
+                <Link href={`/r/${id}/share`} className="btn btn-line">Share this review</Link>
+                <Link href="/" className="btn btn-line">Review another site</Link>
+              </div>
+            </ReviewBody>
           </div>
-          <h1 className="display verdict-title">{roast.headline}</h1>
-        </section>
 
-        <div className="report-main">
-          <section>
-            <h2 className="section-title">How visitors see it</h2>
-            <div className="shots">
-              <figure className="shot shot--phone" style={{ margin: 0 }}>
-                <div className="shot-frame">
-                  {roast.has_mobile_shot ? (
-                    <img src={`/r/${id}/shot/mobile`} alt={`${roast.host} on a phone`} loading="lazy" />
-                  ) : (
-                    <span>No screenshot</span>
-                  )}
-                </div>
-                <figcaption className="shot-cap">Phone</figcaption>
-              </figure>
-              <figure className="shot shot--laptop" style={{ margin: 0 }}>
-                <div className="shot-frame">
-                  {roast.has_desktop_shot ? (
-                    <img src={`/r/${id}/shot/desktop`} alt={`${roast.host} on a laptop`} loading="lazy" />
-                  ) : (
-                    <span>No screenshot</span>
-                  )}
-                </div>
-                <figcaption className="shot-cap">Laptop</figcaption>
-              </figure>
+          <section className="cta" aria-label="Get it fixed">
+            <div className="page cta-inner">
+              <span className="kicker">The rewrite</span>
+              <h2>Want it <em>fixed</em> for you?</h2>
+              <p>A real designer reads this review and sends you a free quote within 24 hours. No obligation.</p>
+              <Link href={`/r/${id}/quote`} className="btn btn-paper">Get a free quote</Link>
             </div>
           </section>
-
-          <section>
-            <h2 className="section-title">Fix these first</h2>
-            <ol className="fixes">
-              {roast.fixes.map((fix, i) => (
-                <li key={fix.title} className="card fix">
-                  <span className="fix-num" aria-hidden="true">{i + 1}</span>
-                  <div className="fix-body">
-                    <span className="fix-title">{fix.title}</span>
-                    <span className="fix-text">{fix.body}</span>
-                    {fix.impact && <span className="fix-impact">{fix.impact}</span>}
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <section className="breakdown">
-            <h2 className="section-title" style={{ marginBottom: 4 }}>Full breakdown</h2>
-            {roast.categories.map((c) => (
-              <details key={c.key}>
-                <summary>
-                  <span className="bd-name">{c.name}</span>
-                  <span className="bd-bar" aria-hidden="true">
-                    <span className="bd-fill" style={{ display: 'block', width: `${c.score ?? 0}%`, background: barColor(c.score) }} />
-                  </span>
-                  <span className="bd-score">{c.score ?? '—'}</span>
-                  <span className="bd-chev"><Chevron /></span>
-                </summary>
-                {c.score == null ? (
-                  <p className="bd-ok">We couldn’t check this one. The site may block automated visitors.</p>
-                ) : c.issues.length ? (
-                  <ul className="bd-list">
-                    {c.issues.map((issue) => <li key={issue}>{issue}</li>)}
-                  </ul>
-                ) : (
-                  <p className="bd-ok">Nothing major here. Nice work.</p>
-                )}
-              </details>
-            ))}
-          </section>
-        </div>
-
-        <aside className="report-actions" aria-label="Next steps">
-          <Link href={`/r/${id}/share`} className="btn btn--ghost btn--block">
-            <ShareIcon /> Share your score
-          </Link>
-          <section className="cta">
-            <h2>Want these fixed for you?</h2>
-            <p>A real designer reviews your report and sends a free quote within 24 hours.</p>
-            <Link href={`/r/${id}/quote`} className="btn btn--dark btn--block">Get a free quote</Link>
-          </section>
-        </aside>
-      </div>
-    </div>
+        </article>
+      </main>
+    </>
   );
 }

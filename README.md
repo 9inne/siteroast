@@ -1,8 +1,8 @@
 # SiteRoast
 
-Free website audits in plain English. Paste a link, get a score, real screenshots and your top three fixes, then share the result or ask for a quote.
+The honest website review. Paste a link and SiteRoast reviews the site like a sharp critic: a score, real screenshots marked up in red pen, and the three fixes that matter most. Share the verdict or ask for a quote.
 
-Built with Next.js 16 (JavaScript), Supabase and the Google PageSpeed Insights API, with Claude writing the verdict.
+Built with Next.js 16 (JavaScript), Motion (animation), Lenis (smooth scrolling), Supabase and the Google PageSpeed Insights API. Claude writes the review and, when `ANTHROPIC_API_KEY` is set, also looks at the phone screenshot to critique the design and circle where each problem is. Without the key, built-in rules write the review and everything else works the same.
 
 ## How a roast works
 
@@ -11,9 +11,9 @@ Built with Next.js 16 (JavaScript), Supabase and the Google PageSpeed Insights A
    - asks our server to read the page's HTML for contact and trust checks (`app/api/check` → `lib/safe-fetch.js` + `lib/html-checks.js`).
 2. The browser sends the short summary to `app/api/roast`, which:
    - scores four categories and an overall score (`lib/scoring.js`)
-   - writes the headline and three fixes with Claude, or with built-in rules if Claude is slow, fails or has no key (`lib/verdict.js`)
+   - writes the headline and three fixes with Claude (reading the test results and the phone screenshot), or with built-in rules if Claude is slow, fails or has no key (`lib/verdict.js`)
    - saves the report in Supabase and returns its id.
-3. **Report** at `/r/<id>`, **share** at `/r/<id>/share` (with an auto-made image at `/r/<id>/card`), and **quote form** at `/r/<id>/quote`, which saves to the `leads` table and can email you through Brevo.
+3. **Review** at `/r/<id>`, **share** at `/r/<id>/share` (with an auto-made image at `/r/<id>/card`), and **quote form** at `/r/<id>/quote`, which saves to the `leads` table and can email you through Brevo.
 
 ## Safety built in
 

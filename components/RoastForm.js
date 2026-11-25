@@ -1,169 +1,163 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { runPageSpeed } from '@/lib/psi-client';
-import { ArrowRight, Check, Circle, FlameIcon, Spinner } from './Icons';
-
-const LINES = [
-  'Timing how long your visitors wait…',
-  'Looking at your site on a tiny phone screen…',
-  'Checking if your buttons actually work…',
-  'Counting the megabytes you make people download…',
-  'Reading your headline like a first-time visitor…',
-  'Asking Google what it thinks of you…',
-];
-
-const STEPS = [
-  { key: 'site', label: 'Loading your site' },
-  { key: 'speed', label: 'Checking speed on a phone' },
-  { key: 'shots', label: 'Taking phone and laptop screenshots' },
-  { key: 'contact', label: 'Testing contact buttons and links' },
-  { key: 'verdict', label: 'Writing your verdict' },
-];
+import Plate from './Plate';
 
 const ERRORS = {
   invalid: 'That doesn’t look like a website address. Try something like yourbusiness.com.',
-  unreachable: 'We couldn’t load that site. Check the link is right and the site is online, then try again.',
-  limited: 'You’ve roasted a lot of sites this hour. Take a breather and try again a little later.',
+  unreachable: 'We couldn’t open that site. Check the link is right and the site is online, then try again.',
+  limited: 'You’ve reviewed a lot of sites this hour. Take a breather and try again a little later.',
   generic: 'Something went wrong on our side. Please try again.',
 };
 
+const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
+const mb = (b) => `${(b / 1_000_000).toFixed(1)} MB`;
+
 function toUrl(input) {
   let raw = input.trim();
-  if (!raw) return null;
+  if (!raw || /\s/.test(raw)) return null;
   if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
   try {
     const u = new URL(raw);
-    if (!u.hostname.includes('.') || /\s/.test(input.trim())) return null;
-    return u.toString();
+    return u.hostname.includes('.') ? u.toString() : null;
   } catch {
     return null;
   }
 }
 
-function Loading({ host, done, error, onRetry, onCancel }) {
-  const [line, setLine] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    if (error) return;
-    const start = Date.now();
-    const t1 = setInterval(() => setLine((l) => (l + 1) % LINES.length), 3200);
-    const t2 = setInterval(() => setElapsed(Date.now() - start), 500);
-    return () => {
-      clearInterval(t1);
-      clearInterval(t2);
-    };
-  }, [error]);
-
-  const doneCount = STEPS.filter((s) => done[s.key]).length;
-  const progress = Math.min(96, Math.max((doneCount / STEPS.length) * 100, (elapsed / 45000) * 90));
-  const active = STEPS.find((s) => !done[s.key])?.key;
-
+function ArrowIcon() {
   return (
-    <section className="loading" aria-live="polite">
-      <div className="loading-head">
-        <div className="loading-orb" aria-hidden="true">
-          <FlameIcon size={48} strokeWidth={1.6} color="var(--lime)" />
-        </div>
-        <span className="faint" style={{ marginTop: 14, fontSize: 14 }}>Roasting {host}</span>
-        <p className="loading-line">{error ? 'That didn’t work.' : LINES[line]}</p>
-      </div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
 
+// The "now reviewing" screen. Each note appears as the real result comes in.
+function Reviewing({ host, notes, shot, pages, error, onReset }) {
+  return (
+    <section className="reviewing" aria-live="polite">
+      <Plate src={shot} loading alt={`${host} on a phone`} caption={<span className="kicker">{shot ? 'Taking notes' : 'Opening the page'}</span>} />
+      <div>
+        <span className="kicker">Now reviewing</span>
+        <h1 className="rv-title">{host}</h1>
+      </div>
+      <div className="pages" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className={i < pages ? 'done' : ''}><i /></span>
+        ))}
+      </div>
+      <ol className="notebook">
+        {notes.map((n, i) => (
+          <li key={n.key} className={!error && i === notes.length - 1 && n.writing ? 'writing' : ''}>
+            <span>{n.text}</span>
+            <b className={n.tone || ''}>{n.value || ''}</b>
+          </li>
+        ))}
+      </ol>
       {error ? (
-        <div className="loading-error">
+        <div className="rv-error">
           <p className="error-text" role="alert">{error}</p>
-          <button type="button" className="btn btn--primary btn--block" onClick={onRetry}>Try another link</button>
+          <button type="button" className="btn btn-ink" onClick={onReset}>Try another link</button>
         </div>
       ) : (
-        <>
-          <div className="progress" role="progressbar" aria-label="Roast progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}>
-            <div className="progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <ul className="checklist">
-            {STEPS.map((s) => (
-              <li key={s.key} className={done[s.key] ? '' : s.key === active ? 'is-active' : 'is-waiting'}>
-                {done[s.key] ? <Check /> : s.key === active ? <Spinner /> : <Circle />}
-                {s.label}
-              </li>
-            ))}
-          </ul>
-          <div className="loading-foot">
-            <button type="button" className="btn btn--ghost" onClick={onCancel} style={{ height: 48 }}>Cancel</button>
-          </div>
-        </>
+        <button type="button" className="btn btn-line" onClick={onReset}>Cancel</button>
       )}
     </section>
   );
 }
 
-export default function RoastForm({ header, sample, children }) {
+export default function RoastForm({ sample, children }) {
   const router = useRouter();
   const [value, setValue] = useState('');
   const [formError, setFormError] = useState('');
-  const [run, setRun] = useState(null); // { host, done, error }
+  const [run, setRun] = useState(null); // { host, notes, shot, pages, error }
   const abortRef = useRef(null);
 
-  const mark = (key) => setRun((r) => (r ? { ...r, done: { ...r.done, [key]: true } } : r));
-  const fail = (msg) => setRun((r) => (r ? { ...r, error: msg } : r));
+  const addNote = (note) => setRun((r) => (r ? { ...r, notes: [...r.notes.filter((n) => n.key !== note.key), note] } : r));
+  const patch = (p) => setRun((r) => (r ? { ...r, ...p } : r));
 
   async function start(e) {
     e.preventDefault();
     const url = toUrl(value);
-    if (!url) {
-      setFormError(ERRORS.invalid);
-      return;
-    }
+    if (!url) return setFormError(ERRORS.invalid);
     setFormError('');
+
     const controller = new AbortController();
     abortRef.current = controller;
     const host = new URL(url).hostname.replace(/^www\./, '');
-    setRun({ host, done: {}, error: '' });
+    setRun({ host, notes: [{ key: 'open', text: 'Opening the homepage on a phone', writing: true }], shot: null, pages: 0, error: '' });
     window.scrollTo({ top: 0 });
 
-    const timeout = (ms) => AbortSignal.any([controller.signal, AbortSignal.timeout(ms)]);
+    const within = (ms) => AbortSignal.any([controller.signal, AbortSignal.timeout(ms)]);
+    let pages = 0;
+    const turnPage = () => patch({ pages: ++pages });
 
     const checkP = fetch('/api/check', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ url }),
-      signal: timeout(15000),
+      signal: within(15000),
     })
       .then((r) => r.json())
       .catch(() => null)
-      .finally(() => mark('contact'));
+      .then((c) => {
+        if (controller.signal.aborted) return c;
+        if (c?.ok) {
+          const f = c.facts;
+          const reach = f.hasPhone || f.hasEmail || f.hasWhatsApp || f.hasForm;
+          addNote({ key: 'reach', text: 'A way to call, email or chat', value: reach ? 'Found' : 'None', tone: reach ? 'ok' : 'bad' });
+          addNote({ key: 'desc', text: 'Description for Google', value: f.description ? 'Yes' : 'Missing', tone: f.description ? 'ok' : 'bad' });
+        } else {
+          addNote({ key: 'reach', text: 'Contact check', value: 'Blocked', tone: 'ok' });
+        }
+        turnPage();
+        return c;
+      });
 
-    const mobileP = runPageSpeed(url, 'mobile', timeout(90000)).then((res) => {
-      mark('site');
-      mark('speed');
-      return res;
+    const mobileP = runPageSpeed(url, 'mobile', within(90000)).then((m) => {
+      if (controller.signal.aborted) return m;
+      patch({ shot: m.screenshot });
+      const slow = (ms, limit) => (ms > limit ? 'bad' : 'ok');
+      if (m.metrics.fcpMs) addNote({ key: 'fcp', text: 'Time until something appears', value: secs(m.metrics.fcpMs), tone: slow(m.metrics.fcpMs, 1800) });
+      if (m.metrics.lcpMs) addNote({ key: 'lcp', text: 'Main content visible', value: secs(m.metrics.lcpMs), tone: slow(m.metrics.lcpMs, 2500) });
+      if (m.metrics.totalBytes) addNote({ key: 'weight', text: 'Weight of the page', value: mb(m.metrics.totalBytes), tone: m.metrics.totalBytes > 3_000_000 ? 'bad' : 'ok' });
+      turnPage();
+      return m;
     });
-    const desktopP = runPageSpeed(url, 'desktop', timeout(90000))
+
+    const desktopP = runPageSpeed(url, 'desktop', within(90000))
       .catch(() => null)
-      .finally(() => mark('shots'));
+      .then((d) => {
+        if (!controller.signal.aborted) {
+          addNote({ key: 'laptop', text: 'Laptop view', value: d ? 'Done' : 'Skipped', tone: 'ok' });
+          turnPage();
+        }
+        return d;
+      });
 
     try {
       const [mobile, desktop, checks] = await Promise.all([mobileP, desktopP, checkP]);
       if (controller.signal.aborted) return;
-      mark('site');
+      addNote({ key: 'write', text: 'Writing the review', writing: true });
 
       const res = await fetch('/api/roast', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ url, mobile, desktop, checks }),
-        signal: timeout(25000),
+        signal: within(30000),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.status === 429) return fail(ERRORS.limited);
-      if (!res.ok || !data.id) return fail(ERRORS.generic);
-
-      mark('verdict');
+      if (res.status === 429) return patch({ error: ERRORS.limited });
+      if (!res.ok || !data.id) return patch({ error: ERRORS.generic });
+      turnPage();
       router.push(`/r/${data.id}`);
     } catch (err) {
       if (controller.signal.aborted) return;
       console.error(err);
-      fail(ERRORS.unreachable);
+      patch({ error: ERRORS.unreachable });
     }
   }
 
@@ -172,29 +166,36 @@ export default function RoastForm({ header, sample, children }) {
     setRun(null);
   }
 
-  if (run) {
-    return (
-      <>
-        {header}
-        <Loading host={run.host} done={run.done} error={run.error} onRetry={reset} onCancel={reset} />
-      </>
-    );
-  }
+  if (run) return <Reviewing {...run} onReset={reset} />;
 
   return (
     <>
-      {header}
       <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">Free website audit</span>
-          <h1 className="display hero-title">Find out what your website is costing you.</h1>
-          <p className="hero-sub">Paste a link. In 30 seconds you get a score, the problems, and how to fix them. No sign-up.</p>
-          <form className="roast-form" onSubmit={start} noValidate>
-            <label htmlFor="site-url" className="label">Website link</label>
-            <div className="roast-form-bar">
+        <div>
+          <span className="kicker fade">The honest website review</span>
+          <h1 className="h-title">
+            <span className="row"><span style={{ '--i': 0 }}>Find out what</span></span>
+            <span className="row"><span style={{ '--i': 1 }}>your website is</span></span>
+            <span className="row open">
+              <span style={{ '--i': 2 }}>
+                <em>
+                  costing you.
+                  <svg className="underline" viewBox="0 0 300 20" preserveAspectRatio="none" aria-hidden="true">
+                    <path className="draw-in" d="M3 13 C 60 5, 120 16, 180 9 S 270 7, 297 12" pathLength="1" />
+                  </svg>
+                </em>
+              </span>
+            </span>
+          </h1>
+          <p className="h-sub fade" style={{ '--dl': '.55s' }}>
+            Paste your link. In 30 seconds, SiteRoast reviews your site like a sharp critic would and tells you, in plain English, what’s driving customers away.
+          </p>
+          <form className="url-form fade" style={{ '--dl': '.7s' }} onSubmit={start} noValidate>
+            <label htmlFor="site-url" className="visually-hidden">Website link</label>
+            <div className="url-field">
+              <span aria-hidden="true">https://</span>
               <input
                 id="site-url"
-                className="input"
                 type="text"
                 inputMode="url"
                 autoComplete="url"
@@ -206,18 +207,11 @@ export default function RoastForm({ header, sample, children }) {
                 aria-invalid={Boolean(formError)}
                 aria-describedby={formError ? 'url-error' : undefined}
               />
-              <button type="submit" className="btn btn--primary">
-                Roast my site <ArrowRight />
-              </button>
             </div>
+            <button type="submit" className="btn btn-ink">Review my site <ArrowIcon /></button>
             {formError && <p id="url-error" className="error-text" role="alert">{formError}</p>}
+            <div className="form-note kicker"><span>Free</span><span>No sign-up</span><span>About 30 seconds</span></div>
           </form>
-          <div className="chips" aria-label="What we check">
-            <span className="chip">Speed</span>
-            <span className="chip">Mobile</span>
-            <span className="chip">SEO</span>
-            <span className="chip">Contact &amp; trust</span>
-          </div>
         </div>
         {sample}
       </section>
