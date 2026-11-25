@@ -258,6 +258,8 @@ button, input { font: inherit; color: inherit; }
 .narrow-title em { font-weight: 400; }
 .share-card { margin-top: 20px; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; aspect-ratio: 1200 / 630; background: var(--paper-2); }
 .share-card img { width: 100%; height: 100%; object-fit: cover; }
+.share-main { margin-top: 22px; width: 100%; height: 56px; gap: 10px; }
+.share-main + .share-grid { margin-top: 10px; }
 .share-grid { margin-top: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .share-btn { height: 54px; border-radius: 999px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500; font-size: 15px; text-decoration: none; cursor: pointer; transition: background-color .2s, color .2s; }
 .share-btn:hover { background: var(--ink); color: var(--paper); }
