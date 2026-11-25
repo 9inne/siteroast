@@ -13,7 +13,7 @@ const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
 const issueList = (v) =>
   (Array.isArray(v) ? v : []).slice(0, 6).map((i) => ({ id: str(i?.id, 80), title: str(i?.title, 140), value: str(i?.value, 60) }));
 const shot = (v) =>
-  typeof v === 'string' && /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 350_000 ? v : null;
+  typeof v === 'string' && /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length <= 800_000 ? v : null;
 
 // Only keep the fields we use, in the shapes we expect.
 function cleanPsi(p) {
