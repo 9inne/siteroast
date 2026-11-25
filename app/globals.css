@@ -278,6 +278,58 @@ button, input { font: inherit; color: inherit; }
 .notfound { min-height: 60vh; display: grid; align-content: center; gap: 16px; justify-items: start; }
 
 /* ==========================================================================
+   Head to Head, before & after
+   ========================================================================== */
+.newer { margin: 14px 0 0; font-size: 15px; color: var(--ink-2); }
+.newer a { color: var(--pen-dark); }
+.h2h-promo { border: 1px solid var(--ink); border-radius: 20px; padding: 22px; display: grid; gap: 10px; justify-items: start; }
+.h2h-promo .muted { margin: 0; }
+.h2h-promo .btn { margin-top: 6px; }
+.ba-line { margin: 14px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; font-family: var(--serif); font-size: 44px; font-weight: 500; letter-spacing: -.03em; }
+.ba-line .up { color: #1F6B3A; }
+.ba-line .down { color: var(--pen-dark); }
+.ba-line .kicker { font-size: 11px; letter-spacing: .1em; flex-basis: 100%; }
+.ba-shots { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 150px)); gap: 14px; }
+
+.h2h-head { border-bottom: 1px solid var(--ink); }
+.h2h { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; padding-block: 8px 48px; }
+.h2h > * { min-width: 0; }
+.h2h-sec { margin-top: 36px; }
+.league { margin: 0; padding: 0; list-style: none; }
+.league li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 16px 8px 18px 0; border-bottom: 1px solid var(--rule); }
+.league li.you { background: linear-gradient(90deg, var(--pen-soft), transparent 85%); }
+.league .pos { font-family: var(--serif); font-style: italic; font-size: 32px; line-height: 1; color: #B0B0AC; text-align: center; }
+.league li.you .pos { color: var(--pen); }
+.lg-name { font-family: var(--serif); font-size: 20px; text-decoration: none; overflow-wrap: anywhere; }
+.lg-name:hover { text-decoration: underline; text-underline-offset: 4px; }
+.lg-name small { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--pen-dark); }
+.lg-score { font-family: var(--serif); font-size: 30px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.lg-score small { font-family: var(--mono); font-size: 10px; color: var(--mute); }
+.lg-bars { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.lg-bar { display: grid; gap: 5px; }
+.lg-bar > span { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.lg-bar i { display: block; height: 3px; background: var(--paper-2); position: relative; }
+.lg-bar b { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
+.lg-bar b.low { background: var(--pen); }
+.gaps { margin: 16px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--ink); }
+.gaps li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--rule); font-family: var(--serif); font-size: 18px; line-height: 1.3; }
+.gaps b { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--pen-dark); align-self: center; white-space: nowrap; }
+.side-shots { margin-top: 16px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.side-shot { display: grid; gap: 6px; text-decoration: none; color: var(--ink); }
+.mini { display: block; position: relative; aspect-ratio: 9 / 18.5; border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; background: var(--paper-2); }
+.mini.you { outline: 2px solid var(--pen); outline-offset: 2px; }
+.mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.mini-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--mute); padding: 6px; }
+.mini-cap { font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); text-align: center; overflow-wrap: anywhere; }
+.side-shot:hover .mini { border-color: var(--ink); }
+
+@media (min-width: 900px) {
+  .h2h { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 64px; padding-block: 8px 72px; }
+  .h2h > .h2h-sec { margin-top: 36px; }
+  .ba-shots { grid-template-columns: repeat(2, minmax(0, 170px)); }
+}
+
+/* ==========================================================================
    Laptop
    ========================================================================== */
 @media (min-width: 900px) {

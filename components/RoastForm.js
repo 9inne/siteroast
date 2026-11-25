@@ -1,31 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { runPageSpeed } from '@/lib/psi-client';
+import { runReview, toUrl, hostOf } from '@/lib/run-review';
 import Plate from './Plate';
 
-const ERRORS = {
+export const ERRORS = {
   invalid: 'That doesn’t look like a website address. Try something like yourbusiness.com.',
   unreachable: 'We couldn’t open that site. Check the link is right and the site is online, then try again.',
   limited: 'You’ve reviewed a lot of sites this hour. Take a breather and try again a little later.',
   generic: 'Something went wrong on our side. Please try again.',
 };
-
-const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
-const mb = (b) => `${(b / 1_000_000).toFixed(1)} MB`;
-
-function toUrl(input) {
-  let raw = input.trim();
-  if (!raw || /\s/.test(raw)) return null;
-  if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
-  try {
-    const u = new URL(raw);
-    return u.hostname.includes('.') ? u.toString() : null;
-  } catch {
-    return null;
-  }
-}
 
 function ArrowIcon() {
   return (
@@ -79,87 +64,49 @@ export default function RoastForm({ sample, children }) {
   const addNote = (note) => setRun((r) => (r ? { ...r, notes: [...r.notes.filter((n) => n.key !== note.key), note] } : r));
   const patch = (p) => setRun((r) => (r ? { ...r, ...p } : r));
 
-  async function start(e) {
-    e.preventDefault();
-    const url = toUrl(value);
+  async function begin(raw) {
+    const url = toUrl(raw);
     if (!url) return setFormError(ERRORS.invalid);
     setFormError('');
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const host = new URL(url).hostname.replace(/^www\./, '');
-    setRun({ host, notes: [{ key: 'open', text: 'Opening the homepage on a phone', writing: true }], shot: null, pages: 0, error: '' });
+    let pages = 0;
+    setRun({ host: hostOf(url), notes: [{ key: 'open', text: 'Opening the homepage on a phone', writing: true }], shot: null, pages: 0, error: '' });
     window.scrollTo({ top: 0 });
 
-    const within = (ms) => AbortSignal.any([controller.signal, AbortSignal.timeout(ms)]);
-    let pages = 0;
-    const turnPage = () => patch({ pages: ++pages });
-
-    const checkP = fetch('/api/check', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url }),
-      signal: within(15000),
-    })
-      .then((r) => r.json())
-      .catch(() => null)
-      .then((c) => {
-        if (controller.signal.aborted) return c;
-        if (c?.ok) {
-          const f = c.facts;
-          const reach = f.hasPhone || f.hasEmail || f.hasWhatsApp || f.hasForm;
-          addNote({ key: 'reach', text: 'A way to call, email or chat', value: reach ? 'Found' : 'None', tone: reach ? 'ok' : 'bad' });
-          addNote({ key: 'desc', text: 'Description for Google', value: f.description ? 'Yes' : 'Missing', tone: f.description ? 'ok' : 'bad' });
-        } else {
-          addNote({ key: 'reach', text: 'Contact check', value: 'Blocked', tone: 'ok' });
-        }
-        turnPage();
-        return c;
-      });
-
-    const mobileP = runPageSpeed(url, 'mobile', within(90000)).then((m) => {
-      if (controller.signal.aborted) return m;
-      patch({ shot: m.screenshot });
-      const slow = (ms, limit) => (ms > limit ? 'bad' : 'ok');
-      if (m.metrics.fcpMs) addNote({ key: 'fcp', text: 'Time until something appears', value: secs(m.metrics.fcpMs), tone: slow(m.metrics.fcpMs, 1800) });
-      if (m.metrics.lcpMs) addNote({ key: 'lcp', text: 'Main content visible', value: secs(m.metrics.lcpMs), tone: slow(m.metrics.lcpMs, 2500) });
-      if (m.metrics.totalBytes) addNote({ key: 'weight', text: 'Weight of the page', value: mb(m.metrics.totalBytes), tone: m.metrics.totalBytes > 3_000_000 ? 'bad' : 'ok' });
-      turnPage();
-      return m;
-    });
-
-    const desktopP = runPageSpeed(url, 'desktop', within(90000))
-      .catch(() => null)
-      .then((d) => {
-        if (!controller.signal.aborted) {
-          addNote({ key: 'laptop', text: 'Laptop view', value: d ? 'Done' : 'Skipped', tone: 'ok' });
-          turnPage();
-        }
-        return d;
-      });
-
     try {
-      const [mobile, desktop, checks] = await Promise.all([mobileP, desktopP, checkP]);
-      if (controller.signal.aborted) return;
-      addNote({ key: 'write', text: 'Writing the review', writing: true });
-
-      const res = await fetch('/api/roast', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url, mobile, desktop, checks }),
-        signal: within(30000),
+      const id = await runReview(url, {
+        kind: 'main',
+        signal: controller.signal,
+        onShot: (shot) => patch({ shot }),
+        onNote: (note) => {
+          addNote(note);
+          if (['reach', 'lcp', 'laptop', 'write'].includes(note.key)) patch({ pages: ++pages });
+        },
       });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 429) return patch({ error: ERRORS.limited });
-      if (!res.ok || !data.id) return patch({ error: ERRORS.generic });
-      turnPage();
-      router.push(`/r/${data.id}`);
+      if (controller.signal.aborted) return;
+      router.push(`/r/${id}`);
     } catch (err) {
       if (controller.signal.aborted) return;
-      console.error(err);
-      patch({ error: ERRORS.unreachable });
+      patch({ error: ERRORS[err.message] || ERRORS.unreachable });
     }
   }
+
+  function start(e) {
+    e.preventDefault();
+    begin(value);
+  }
+
+  // "Re-check this site" links here as /?check=site.com and starts straight away.
+  useEffect(() => {
+    const check = new URLSearchParams(window.location.search).get('check');
+    if (!check) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    setValue(check);
+    begin(check);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function reset() {
     abortRef.current?.abort();

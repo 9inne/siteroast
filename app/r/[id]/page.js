@@ -4,7 +4,7 @@ import Masthead from '@/components/Logo';
 import Lines from '@/components/Lines';
 import Stamp from '@/components/Stamp';
 import ReviewBody from '@/components/ReviewBody';
-import { getRoast, percentileFor } from '@/lib/supabase';
+import { getRoast, percentileFor, previousRoast, newerRoast } from '@/lib/supabase';
 import { scoreLabel } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,12 @@ export default async function Review({ params }) {
   if (!roast) notFound();
 
   const label = scoreLabel(roast.score);
-  const percentile = await percentileFor(roast.score).catch(() => null);
+  const [percentile, before, newer] = await Promise.all([
+    percentileFor(roast.score).catch(() => null),
+    previousRoast(roast.host, roast.created_at).catch(() => null),
+    newerRoast(roast.host, roast.created_at).catch(() => null),
+  ]);
+  const change = before ? roast.score - before.score : null;
 
   return (
     <>
@@ -68,6 +73,9 @@ export default async function Review({ params }) {
                   <span>{reviewedWhen(roast.created_at)}</span>
                   {percentile != null && <span>Better than {percentile}% of sites reviewed</span>}
                 </div>
+                {newer && (
+                  <p className="newer">There’s a newer review of this site. <Link href={`/r/${newer.id}`}>See the latest ({newer.score}/100)</Link></p>
+                )}
               </div>
               <div className="stamp-wrap">
                 <Stamp score={roast.score} />
@@ -79,6 +87,35 @@ export default async function Review({ params }) {
             </header>
 
             <ReviewBody host={roast.host} shotSrc={roast.has_mobile_shot ? `/r/${id}/shot/mobile` : null} fixes={roast.fixes}>
+              <section className="h2h-promo">
+                <span className="kicker">Head to Head</span>
+                <h2 className="sec-h">How do you compare with your <em>competitors</em>?</h2>
+                <p className="muted">Review up to three rival websites side by side and see exactly what it takes to beat them.</p>
+                <Link href={`/r/${id}/compare`} className="btn btn-ink">Compare with competitors</Link>
+              </section>
+
+              {before && (
+                <section aria-label="Before and after">
+                  <h2 className="sec-h">Before <em>&amp;</em> after</h2>
+                  <p className="ba-line">
+                    <span>{before.score}</span>
+                    <span aria-hidden="true">→</span>
+                    <span className={change >= 0 ? 'up' : 'down'}>{roast.score}</span>
+                    <span className="kicker">{change === 0 ? 'No change' : `${change > 0 ? '+' : ''}${change} points`} since {new Date(before.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  </p>
+                  <div className="ba-shots">
+                    <Link href={`/r/${before.id}`} className="side-shot">
+                      <span className="mini">{before.has_mobile_shot ? <img src={`/r/${before.id}/shot/mobile`} alt={`${roast.host} before`} loading="lazy" /> : <span className="mini-empty">No screenshot</span>}</span>
+                      <span className="mini-cap">Before · {before.score}</span>
+                    </Link>
+                    <span className="side-shot">
+                      <span className="mini you">{roast.has_mobile_shot ? <img src={`/r/${id}/shot/mobile`} alt={`${roast.host} now`} loading="lazy" /> : <span className="mini-empty">No screenshot</span>}</span>
+                      <span className="mini-cap">Now · {roast.score}</span>
+                    </span>
+                  </div>
+                </section>
+              )}
+
               <section>
                 <h2 className="sec-h">The <em>scorecard</em></h2>
                 <div className="score-rows">
@@ -113,6 +150,7 @@ export default async function Review({ params }) {
 
               <div className="quick">
                 <Link href={`/r/${id}/share`} className="btn btn-line">Share this review</Link>
+                <Link href={`/?check=${encodeURIComponent(roast.host)}`} className="btn btn-line">Re-check this site</Link>
                 <Link href="/" className="btn btn-line">Review another site</Link>
               </div>
             </ReviewBody>

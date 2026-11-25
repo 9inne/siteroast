@@ -6,7 +6,9 @@ import { db, newId, hashIp, clientIp } from '@/lib/supabase';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ROASTS_PER_HOUR = 10;
+// Per visitor, per hour. Competitor reviews ("rival") have their own, larger allowance:
+// one Head to Head can add up to three of them.
+const LIMITS = { main: 10, rival: 30 };
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
@@ -60,6 +62,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'bad-request' }, { status: 400 });
   }
 
+  const kind = body?.kind === 'rival' ? 'rival' : 'main';
   const mobile = cleanPsi(body?.mobile);
   const desktop = cleanPsi(body?.desktop);
   const checks = cleanChecks(body?.checks);
@@ -77,26 +80,40 @@ export async function POST(request) {
 
   const ipHash = hashIp(clientIp(request));
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await db().from('roasts').select('id', { count: 'exact', head: true }).eq('ip_hash', ipHash).gte('created_at', since);
-  if ((count || 0) >= ROASTS_PER_HOUR) {
+  const { count } = await db()
+    .from('roasts')
+    .select('id', { count: 'exact', head: true })
+    .eq('ip_hash', ipHash)
+    .eq('kind', kind)
+    .gte('created_at', since);
+  if ((count || 0) >= LIMITS[kind]) {
     return NextResponse.json({ error: 'rate-limited' }, { status: 429 });
   }
 
   const host = url.hostname.replace(/^www\./, '');
   const { score, categories } = buildCategories({ mobile, checks });
-  const verdict = await writeVerdict({ host, mobile, checks, categories, score });
+  // Competitor reviews use the built-in rules: they only feed the league table.
+  const verdict = await writeVerdict({ host, mobile, checks, categories, score }, { ai: kind === 'main' });
+  const f = checks?.facts;
 
   const id = newId();
   const { error } = await db().from('roasts').insert({
     id,
     url: url.toString(),
     host,
+    kind,
     score,
     categories,
     headline: verdict.headline,
     fixes: verdict.fixes,
     verdict_source: verdict.source,
-    metrics: { mobile: mobile.metrics, desktop: desktop?.metrics || null, scores: mobile.scores },
+    metrics: {
+      mobile: mobile.metrics,
+      desktop: desktop?.metrics || null,
+      scores: mobile.scores,
+      // A few plain facts the Head to Head page compares between sites.
+      facts: f ? { reach: f.hasPhone || f.hasEmail || f.hasWhatsApp || f.hasForm, description: Boolean(f.description), https: f.https } : null,
+    },
     shot_mobile: mobile.screenshot,
     shot_desktop: desktop?.screenshot || null,
     ip_hash: ipHash,

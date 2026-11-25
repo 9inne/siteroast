@@ -41,3 +41,5 @@ create index if not exists leads_roast_idx on public.leads (roast_id);
 
 alter table public.roasts enable row level security;
 alter table public.leads  enable row level security;
+
+-- Phase 1 additions (Head to Head, before & after) live in phase1.sql.
