@@ -15,7 +15,11 @@ export default async function Share({ params }) {
 
   const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
   const reportUrl = `${site}/r/${id}`;
-  const text = `My website ${roast.host} just got reviewed on SiteRoast: ${roast.score}/100. ${String(roast.headline).replace(/\*/g, '')}`;
+  // X and LinkedIn turn "ordaa.ng" into a link and show THAT site's preview
+  // instead of the SiteRoast card. A one-dot leader (U+2024) looks like a
+  // full stop but isn't one, so the review link stays the only real link.
+  const siteName = roast.host.replace(/^www\./, '').replace(/\./g, '․');
+  const text = `My website ${siteName} just got reviewed on SiteRoast: ${roast.score}/100. ${String(roast.headline).replace(/\*/g, '')}`;
 
   return (
     <>

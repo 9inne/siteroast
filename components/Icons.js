@@ -68,6 +68,16 @@ export function LinkIcon({ size = 18 }) {
   );
 }
 
+export function ShareIcon({ size = 18 }) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 15V3" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" />
+    </svg>
+  );
+}
+
 export function DownloadIcon({ size = 18 }) {
   return (
     <svg {...base(size)}>
